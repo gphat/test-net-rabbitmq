@@ -1,55 +1,93 @@
-Test-Net-RabbitMQ
+NAME
+    Test::Net::RabbitMQ - A mock RabbitMQ implementation for use when
+    testing.
 
-The README is used to introduce the module and provide instructions on
-how to install the module, any machine dependencies it may have (for
-example C compilers and installed libraries) and any other information
-that should be provided before the module is installed.
+SYNOPSIS
+        use Test::Net::RabbitMQ;
 
-A README file is required for CPAN modules since CPAN extracts the README
-file from a module distribution so that people browsing the archive
-can use it to get an idea of the module's uses. It is usually a good idea
-to provide version information here so that people can decide whether
-fixes for the module are worth downloading.
+        my $mq = Test::Net::RabbitMQ->new;
 
+        $mq->connect;
 
-INSTALLATION
+        $mq->channel_open(1);
 
-To install this module, run the following commands:
+        $mq->exchange_declare(1, 'order');
+        $mq->queue_declare(1, 'new-orders');
 
-	perl Makefile.PL
-	make
-	make test
-	make install
+        $mq->queue_bind(1, 'new-orders', 'order', 'order.new');
 
-SUPPORT AND DOCUMENTATION
+        $mq->publish(1, 'order.new', 'hello!', { exchange => 'order' });
 
-After installing, you can find documentation for this module with the
-perldoc command.
+        $mq->consume(1, 'new-orders');
 
-    perldoc Test::Net::RabbitMQ
+        my $msg = $mq->recv;
 
-You can also look for information at:
+DESCRIPTION
+    Test::Net::RabbitMQ is a terrible approximation of using the real thing,
+    but hopefully will allow you to test systems that use Net::RabbitMQ
+    without having to use an actual RabbitMQ instance.
 
-    RT, CPAN's request tracker
-        http://rt.cpan.org/NoAuth/Bugs.html?Dist=Test-Net-RabbitMQ
+CAVEATS
+    Patches are welcome! At the moment there are a number of shortcomings:
 
-    AnnoCPAN, Annotated CPAN documentation
-        http://annocpan.org/dist/Test-Net-RabbitMQ
+    "recv" doesn't block
+    routing_keys do not work with wildcards
+    lots of other stuff!
 
-    CPAN Ratings
-        http://cpanratings.perl.org/d/Test-Net-RabbitMQ
+ATTRIBUTES
+  connectable
+    If false then any calls to connect will die to emulate a failed
+    connection.
 
-    Search CPAN
-        http://search.cpan.org/dist/Test-Net-RabbitMQ/
+METHODS
+  channel_open($number)
+    Opens a channel with the specific number.
 
+  channel_close($number)
+    Closes the specific channel.
 
-COPYRIGHT AND LICENCE
+connect
+    Connects this instance. Does nothing except set "connected" to true.
+    Will throw an exception if you've set "connectable" to false.
 
-Copyright (C) 2010 Cory G Watson
+consume($channel, $queue)
+    Sets the queue that will be popped when "recv" is called.
 
-This program is free software; you can redistribute it and/or modify it
-under the terms of either: the GNU General Public License as published
-by the Free Software Foundation; or the Artistic License.
+disconnect
+    Disconnects this instance by setting "connected" to false.
 
-See http://dev.perl.org/licenses/ for more information.
+exchange_declare($channel, $exchange, $options)
+    Creates an exchange of the specified name.
+
+queue_bind($channel, $queue, $exchange, $routing_key)
+    Binds the specified queue to the specified exchange using the provided
+    routing key. Note that, at the moment, this doesn't work with AMQP
+    wildcards. Only with exact matches of the routing key.
+
+queue_declare($channel, $queue, $options)
+    Creates a queue of the specified name.
+
+queue_unbind($channel, $queue, $exchange, $routing_key)
+    Unbinds the specified routing key from the provided queue and exchange.
+
+publish($channel, $routing_key, $body, $options)
+    Publishes the specified body with the supplied routing key. If there is
+    a binding that matches then the message will be added to the appropriate
+    queue(s).
+
+recv
+    Provided you've called "consume" then calls to recv will "pop" the next
+    message of the queue. Note that this method does not block.
+
+AUTHOR
+    Cory G Watson, "<gphat at cpan.org>"
+
+COPYRIGHT & LICENSE
+    Copyright 2010 Cory G Watson.
+
+    This program is free software; you can redistribute it and/or modify it
+    under the terms of either: the GNU General Public License as published
+    by the Free Software Foundation; or the Artistic License.
+
+    See http://dev.perl.org/licenses/ for more information.
 

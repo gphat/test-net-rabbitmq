@@ -27,6 +27,10 @@ DESCRIPTION
     but hopefully will allow you to test systems that use Net::RabbitMQ
     without having to use an actual RabbitMQ instance.
 
+    The general overview is that calls to "publish" pushes a message into
+    one or more queues (or none if there are no bindings) and calls to
+    "recv" pop them.
+
 CAVEATS
     Patches are welcome! At the moment there are a number of shortcomings:
 

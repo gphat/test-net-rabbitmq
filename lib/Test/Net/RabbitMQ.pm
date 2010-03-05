@@ -230,6 +230,10 @@ Test::Net::RabbitMQ is a terrible approximation of using the real thing, but
 hopefully will allow you to test systems that use L<Net::RabbitMQ> without
 having to use an actual RabbitMQ instance.
 
+The general overview is that calls to C<publish> pushes a message into one
+or more queues (or none if there are no bindings) and calls to C<recv>
+pop them.
+
 =head1 CAVEATS
 
 Patches are welcome! At the moment there are a number of shortcomings:

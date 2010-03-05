@@ -12,7 +12,7 @@ has bindings => (
     default => sub { {} },
     handles => {
         _binding_exists => 'exists',
-        _get_bindind    => 'get',
+        _get_binding    => 'get',
         _remove_binding => 'delete',
         _set_binding    => 'set',
     }
@@ -56,6 +56,11 @@ has exchanges => (
     }
 );
 
+has queue => (
+    is => 'rw',
+    isa => 'Str'
+);
+
 has queues => (
     traits => [ qw(Hash) ],
     is => 'rw',
@@ -95,8 +100,22 @@ sub connect {
     $self->connected(1);
 }
 
+sub consume {
+    my ($self, $channel, $queue) = @_;
+
+    die "Not connected" unless $self->connected;
+
+    die "Unknown channel" unless $self->_channel_exists($channel);
+
+    die "Unknown queue" unless $self->_queue_exists($queue);
+
+    $self->queue($queue);
+}
+
 sub disconnect {
     my ($self) = @_;
+
+    die "Not connected" unless $self->connected;
 
     $self->connected(0);
 }
@@ -133,6 +152,49 @@ sub queue_declare {
     die "Unknown channel" unless $self->_channel_exists($channel);
 
     $self->_set_queue($queue, []);
+}
+
+sub queue_unbind {
+    my ($self, $channel, $queue, $exchange, $routing_key) = @_;
+
+    die "Not connected" unless $self->connected;
+
+    die "Unknown channel" unless $self->_channel_exists($channel);
+
+    die "Unknown queue" unless $self->_queue_exists($queue);
+
+    die "Unknown exchange" unless $self->_exchange_exists($exchange);
+
+    die "Unknown routing" unless $self->_binding_exists($routing_key);
+
+    $self->_remove_binding($routing_key);
+}
+
+sub publish {
+    my ($self, $channel, $routing_key, $body, $options) = @_;
+
+    die "Not connected" unless $self->connected;
+
+    die "Unknown channel" unless $self->_channel_exists($channel);
+
+    my $exchange = $options->{exchange};
+    die "Unknown exchange" unless $self->_exchange_exists($exchange);
+
+    if($self->_binding_exists($routing_key)) {
+        my $bind = $self->_get_binding($routing_key);
+        push(@{ $self->_get_queue($bind->{queue}) }, $body);
+    }
+}
+
+sub recv {
+    my ($self) = @_;
+
+    die "Not connected" unless $self->connected;
+
+    my $queue = $self->queue;
+    die "No queue, did you consume() first?" unless defined($queue);
+
+    pop(@{ $self->_get_queue($self->queue) });
 }
 
 1;

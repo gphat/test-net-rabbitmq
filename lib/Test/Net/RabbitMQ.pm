@@ -3,7 +3,7 @@ use Moose;
 use warnings;
 use strict;
 
-our $VERSION = '0.02';
+our $VERSION = '0.03';
 
 has bindings => (
     traits => [ qw(Hash) ],
@@ -139,7 +139,7 @@ sub get {
 
     die "Unknown queue" unless $self->_queue_exists($queue);
 
-    pop(@{ $self->_get_queue($self->queue) });
+    pop(@{ $self->_get_queue($queue) });
 }
 
 sub queue_bind {

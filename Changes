@@ -1,5 +1,10 @@
 Revision history for Test-Net-RabbitMQ
 
+0.02    Tue May 25, 2010
+    * Implement get method.
+    * POD fixes
+    
+
 0.01    Date/time
         First version, released on an unsuspecting world.
 

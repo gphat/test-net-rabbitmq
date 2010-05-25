@@ -22,4 +22,9 @@ $mq->consume(1, 'new-orders');
 my $msg = $mq->recv;
 cmp_ok($msg, 'eq', 'hello!', 'recv got the message');
 
+$mq->publish(1, 'order.new', 'hello!', { exchange => 'order' });
+
+my $msg = $mq->get(1, 'new-orders', {});
+cmp_ok($msg, 'eq', 'hello!', 'get got the message');
+
 done_testing;

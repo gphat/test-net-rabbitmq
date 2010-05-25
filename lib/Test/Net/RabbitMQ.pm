@@ -3,7 +3,7 @@ use Moose;
 use warnings;
 use strict;
 
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 
 has bindings => (
     traits => [ qw(Hash) ],
@@ -130,6 +130,18 @@ sub exchange_declare {
     $self->_set_exchange($exchange, 1);
 }
 
+sub get {
+    my ($self, $channel, $queue, $options) = @_;
+
+    die "Not connected" unless $self->connected;
+
+    die "Unknown channel" unless $self->_channel_exists($channel);
+
+    die "Unknown queue" unless $self->_queue_exists($queue);
+
+    pop(@{ $self->_get_queue($self->queue) });
+}
+
 sub queue_bind {
     my ($self, $channel, $queue, $exchange, $routing_key) = @_;
 
@@ -223,6 +235,10 @@ Test::Net::RabbitMQ - A mock RabbitMQ implementation for use when testing.
     $mq->consume(1, 'new-orders');
 
     my $msg = $mq->recv;
+    
+    # Or
+    
+    my $msg = $mq->get(1, 'order.new', {});
 
 =head1 DESCRIPTION
 
@@ -264,43 +280,47 @@ Opens a channel with the specific number.
 
 Closes the specific channel.
 
-=head1 connect
+=head2 connect
 
 Connects this instance.  Does nothing except set C<connected> to true.  Will
 throw an exception if you've set C<connectable> to false.
 
-=head1 consume($channel, $queue)
+=head2 consume($channel, $queue)
 
 Sets the queue that will be popped when C<recv> is called.
 
-=head1 disconnect
+=head2 disconnect
 
 Disconnects this instance by setting C<connected> to false.
 
-=head1 exchange_declare($channel, $exchange, $options)
+=head2 exchange_declare($channel, $exchange, $options)
 
 Creates an exchange of the specified name.
 
-=head1 queue_bind($channel, $queue, $exchange, $routing_key)
+=head2 get ($channel, $queue, $options)
+
+Get a message from the queue, if there is one.
+
+=head2 queue_bind($channel, $queue, $exchange, $routing_key)
 
 Binds the specified queue to the specified exchange using the provided
 routing key.  B<Note that, at the moment, this doesn't work with AMQP wildcards.
 Only with exact matches of the routing key.>
 
-=head1 queue_declare($channel, $queue, $options)
+=head2 queue_declare($channel, $queue, $options)
 
 Creates a queue of the specified name.
 
-=head1 queue_unbind($channel, $queue, $exchange, $routing_key)
+=head2 queue_unbind($channel, $queue, $exchange, $routing_key)
 
 Unbinds the specified routing key from the provided queue and exchange.
 
-=head1 publish($channel, $routing_key, $body, $options)
+=head2 publish($channel, $routing_key, $body, $options)
 
 Publishes the specified body with the supplied routing key.  If there is a
 binding that matches then the message will be added to the appropriate queue(s).
 
-=head1 recv
+=head2 recv
 
 Provided you've called C<consume> then calls to recv will C<pop> the next
 message of the queue.  B<Note that this method does not block.>
@@ -318,7 +338,6 @@ under the terms of either: the GNU General Public License as published
 by the Free Software Foundation; or the Artistic License.
 
 See http://dev.perl.org/licenses/ for more information.
-
 
 =cut
 

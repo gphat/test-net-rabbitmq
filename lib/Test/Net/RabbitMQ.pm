@@ -3,19 +3,20 @@ use Moose;
 use warnings;
 use strict;
 
-our $VERSION = '0.03';
+our $VERSION = '0.04';
 
+# Bindings are stored in the following form:
+# {
+#   exchange_name => {
+#      regex => queue_name
+#   },
+#   ...
+# }
 has bindings => (
     traits => [ qw(Hash) ],
     is => 'rw',
     isa => 'HashRef',
     default => sub { {} },
-    handles => {
-        _binding_exists => 'exists',
-        _get_binding    => 'get',
-        _remove_binding => 'delete',
-        _set_binding    => 'set',
-    }
 );
 
 has connectable => (
@@ -143,17 +144,37 @@ sub get {
 }
 
 sub queue_bind {
-    my ($self, $channel, $queue, $exchange, $routing_key) = @_;
+    my ($self, $channel, $queue, $exchange, $pattern) = @_;
 
     die "Not connected" unless $self->connected;
 
-    die "Unknown channel" unless $self->_channel_exists($channel);
+    die "Unknown channel: $channel" unless $self->_channel_exists($channel);
 
-    die "Unknown queue" unless $self->_queue_exists($queue);
+    die "Unknown queue: $queue" unless $self->_queue_exists($queue);
 
-    die "Unknown exchange" unless $self->_exchange_exists($exchange);
+    die "Unknown exchange: $exchange" unless $self->_exchange_exists($exchange);
 
-    $self->_set_binding($routing_key, { queue => $queue, exchange => $exchange });
+    my $binds = $self->bindings->{$exchange} || {};
+
+    # Turn the pattern we're given into an actual regex
+    my $regex = $pattern;
+    if(($pattern =~ /\#/) || ($pattern =~ /\*/)) {
+        if($pattern =~ /\#/) {
+            $regex =~ s/\#/\.\*/g;
+        } elsif($pattern =~ /\*/) {
+            $regex =~ s/\*/\[^\.]\*/g;
+        }
+        $regex = '^'.$regex.'$';
+        $regex = qr($regex);
+    } else {
+        $regex = qr/^$pattern$/;
+    }
+
+    # $self->_set_binding($routing_key, { queue => $queue, exchange => $exchange });
+    $binds->{$regex} = $queue;
+
+    # In case these are new bindings
+    $self->bindings->{$exchange} = $binds;
 }
 
 sub queue_declare {
@@ -161,7 +182,7 @@ sub queue_declare {
 
     die "Not connected" unless $self->connected;
 
-    die "Unknown channel" unless $self->_channel_exists($channel);
+    die "Unknown channel: $channel" unless $self->_channel_exists($channel);
 
     $self->_set_queue($queue, []);
 }
@@ -171,13 +192,13 @@ sub queue_unbind {
 
     die "Not connected" unless $self->connected;
 
-    die "Unknown channel" unless $self->_channel_exists($channel);
+    die "Unknown channel: $channel" unless $self->_channel_exists($channel);
 
-    die "Unknown queue" unless $self->_queue_exists($queue);
+    die "Unknown queue: $queue" unless $self->_queue_exists($queue);
 
-    die "Unknown exchange" unless $self->_exchange_exists($exchange);
+    die "Unknown exchange: $queue" unless $self->_exchange_exists($exchange);
 
-    die "Unknown routing" unless $self->_binding_exists($routing_key);
+    die "Unknown routing: $routing_key" unless $self->_binding_exists($routing_key);
 
     $self->_remove_binding($routing_key);
 }
@@ -187,14 +208,22 @@ sub publish {
 
     die "Not connected" unless $self->connected;
 
-    die "Unknown channel" unless $self->_channel_exists($channel);
+    die "Unknown channel: $channel" unless $self->_channel_exists($channel);
 
     my $exchange = $options->{exchange};
-    die "Unknown exchange" unless $self->_exchange_exists($exchange);
+    unless($exchange) {
+        $exchange = 'amq.direct';
+    }
 
-    if($self->_binding_exists($routing_key)) {
-        my $bind = $self->_get_binding($routing_key);
-        push(@{ $self->_get_queue($bind->{queue}) }, $body);
+    die "Unknown exchange: $exchange" unless $self->_exchange_exists($exchange);
+
+    # Get the bindings for the specified exchange and test each key to see
+    # if our routing key matches.  If it does, push it into the queue
+    my $binds = $self->bindings->{$exchange};
+    foreach my $pattern (keys %{ $binds }) {
+        if($routing_key =~ $pattern) {
+            push(@{ $self->_get_queue($binds->{$pattern}) }, $body);
+        }
     }
 }
 
@@ -259,6 +288,8 @@ Patches are welcome! At the moment there are a number of shortcomings:
 =item C<recv> doesn't block
 
 =item routing_keys do not work with wildcards
+
+=item exchanges are all topic
 
 =item lots of other stuff!
 

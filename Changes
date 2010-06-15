@@ -1,5 +1,9 @@
 Revision history for Test-Net-RabbitMQ
 
+0.04    Fri Jun 4, 2010
+    * Default exchange to amq.direct
+    * Add support for wildcard bindings (# and *)
+
 0.03    Tue May 25, 2010
     * Fix bug in get implementation
 

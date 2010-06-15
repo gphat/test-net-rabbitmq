@@ -17,3 +17,4 @@ t/channels.t
 t/connections.t
 t/pubsub.t
 t/simple.t
+t/wildcard.t

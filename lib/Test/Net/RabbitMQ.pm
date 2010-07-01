@@ -3,7 +3,7 @@ use Moose;
 use warnings;
 use strict;
 
-our $VERSION = '0.04';
+our $VERSION = '0.05';
 
 # Bindings are stored in the following form:
 # {
@@ -42,6 +42,12 @@ has channels => (
         _remove_channel => 'delete',
         _set_channel    => 'set',
     }
+);
+
+has debug => (
+    is => 'rw',
+    isa => 'Bool',
+    default => 0
 );
 
 has exchanges => (
@@ -222,6 +228,7 @@ sub publish {
     my $binds = $self->bindings->{$exchange};
     foreach my $pattern (keys %{ $binds }) {
         if($routing_key =~ $pattern) {
+            print STDERR "Publishing '$routing_key' to ".$binds->{$pattern}."\n" if $self->debug;
             push(@{ $self->_get_queue($binds->{$pattern}) }, $body);
         }
     }
@@ -281,13 +288,13 @@ pop them.
 
 =head1 CAVEATS
 
-Patches are welcome! At the moment there are a number of shortcomings:
+This module has all the features I've needed to successfully test our 
+RabbitMQ-using application. Patches are welcome if I'm missing something you
+need! At the moment there are a number of shortcomings:
 
 =over 4
 
 =item C<recv> doesn't block
-
-=item routing_keys do not work with wildcards
 
 =item exchanges are all topic
 
@@ -300,6 +307,11 @@ Patches are welcome! At the moment there are a number of shortcomings:
 =head2 connectable
 
 If false then any calls to connect will die to emulate a failed connection.
+
+=head2 debug
+
+If set to true (which you can do at any time) then a message will be emmitted
+to STDERR any time a message is added to a queue.
 
 =head1 METHODS
 

@@ -1,5 +1,8 @@
 Revision history for Test-Net-RabbitMQ
 
+0.05    Thu Jul 1, 2010
+    * Add debug attribute for printing out publishes
+
 0.04    Fri Jun 4, 2010
     * Default exchange to amq.direct
     * Add support for wildcard bindings (# and *)

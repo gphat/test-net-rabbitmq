@@ -3,7 +3,7 @@ use Moose;
 use warnings;
 use strict;
 
-our $VERSION = '0.05';
+our $VERSION = '0.06';
 
 # Bindings are stored in the following form:
 # {
@@ -144,7 +144,7 @@ sub get {
 
     die "Unknown channel" unless $self->_channel_exists($channel);
 
-    die "Unknown queue" unless $self->_queue_exists($queue);
+    die "Unknown queue: $queue" unless $self->_queue_exists($queue);
 
     pop(@{ $self->_get_queue($queue) });
 }

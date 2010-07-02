@@ -1,5 +1,8 @@
 Revision history for Test-Net-RabbitMQ
 
+0.06    Fri Jul 2, 2010
+    * Mention the name of the queue get when is called and the queue doesn't exist.
+
 0.05    Thu Jul 1, 2010
     * Add debug attribute for printing out publishes
 

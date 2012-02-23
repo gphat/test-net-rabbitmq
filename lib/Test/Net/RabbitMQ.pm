@@ -81,6 +81,18 @@ has queues => (
     }
 );
 
+has delivery_tag => (
+    traits  => [ qw(Counter) ],
+    is      => 'ro',
+    isa     => 'Num',
+    default => 0,
+    handles => {
+        _inc_delivery_tag   => 'inc',
+        _dec_delivery_tag   => 'dec',
+        _reset_delivery_tag => 'reset',
+    },
+);
+
 sub channel_close {
     my ($self, $channel) = @_;
 
@@ -146,7 +158,16 @@ sub get {
 
     die "Unknown queue: $queue" unless $self->_queue_exists($queue);
 
-    pop(@{ $self->_get_queue($queue) });
+    my $message = pop(@{ $self->_get_queue($queue) });
+
+    return undef unless defined($message);
+
+    $message->{delivery_tag}  = $self->_inc_delivery_tag;
+    $message->{content_type}  = '';
+    $message->{redelivered}   = 0;
+    $message->{message_count} = 0;
+
+    return $message;
 }
 
 sub queue_bind {
@@ -210,7 +231,7 @@ sub queue_unbind {
 }
 
 sub publish {
-    my ($self, $channel, $routing_key, $body, $options) = @_;
+    my ($self, $channel, $routing_key, $body, $options, $props) = @_;
 
     die "Not connected" unless $self->connected;
 
@@ -229,7 +250,13 @@ sub publish {
     foreach my $pattern (keys %{ $binds }) {
         if($routing_key =~ $pattern) {
             print STDERR "Publishing '$routing_key' to ".$binds->{$pattern}."\n" if $self->debug;
-            push(@{ $self->_get_queue($binds->{$pattern}) }, $body);
+            my $message = {
+                body         => $body,
+                routing_key  => $routing_key,
+                exchange     => $exchange,
+                props        => $props,
+            };
+            push(@{ $self->_get_queue($binds->{$pattern}) }, $message);
         }
     }
 }
@@ -242,7 +269,14 @@ sub recv {
     my $queue = $self->queue;
     die "No queue, did you consume() first?" unless defined($queue);
 
-    pop(@{ $self->_get_queue($self->queue) });
+    my $message = pop(@{ $self->_get_queue($self->queue) });
+
+    return undef unless defined $message;
+
+    $message->{delivery_tag} = $self->_inc_delivery_tag;
+    $message->{consumer_tag} = '';
+
+    return $message;
 }
 
 1;
@@ -344,6 +378,18 @@ Creates an exchange of the specified name.
 
 Get a message from the queue, if there is one.
 
+Like C<Net::RabbitMQ>, this will return a hash containing the following
+information:
+
+     {
+       body => 'Magic Transient Payload', # the reconstructed body
+       routing_key => 'nr_test_q',        # route the message took
+       exchange => 'nr_test_x',           # exchange used
+       delivery_tag => 1,                 # (inc'd every recv or get)
+       redelivered => 0,                  # always 0
+       message_count => 0,                # always 0
+     }
+
 =head2 queue_bind($channel, $queue, $exchange, $routing_key)
 
 Binds the specified queue to the specified exchange using the provided
@@ -367,6 +413,18 @@ binding that matches then the message will be added to the appropriate queue(s).
 
 Provided you've called C<consume> then calls to recv will C<pop> the next
 message of the queue.  B<Note that this method does not block.>
+
+Like C<Net::RabbitMQ>, this will return a hash containing the following
+information:
+
+     {
+       body => 'Magic Transient Payload', # the reconstructed body
+       routing_key => 'nr_test_q',        # route the message took
+       exchange => 'nr_test_x',           # exchange used
+       delivery_tag => 1,                 # (inc'd every recv or get)
+       consumer_tag => '',                # Always blank currently
+       props => $props,                   # hashref sent in
+     }
 
 =head1 AUTHOR
 

@@ -20,11 +20,11 @@ $mq->publish(1, 'order.new', 'hello!', { exchange => 'order' });
 $mq->consume(1, 'new-orders');
 
 my $msg = $mq->recv;
-cmp_ok($msg, 'eq', 'hello!', 'recv got the message');
+cmp_ok($msg->{body}, 'eq', 'hello!', 'recv got the message');
 
 $mq->publish(1, 'order.new', 'hello!', { exchange => 'order' });
 
 my $msg2 = $mq->get(1, 'new-orders', {});
-cmp_ok($msg2, 'eq', 'hello!', 'get got the message');
+cmp_ok($msg2->{body}, 'eq', 'hello!', 'get got the message');
 
 done_testing;

@@ -1,5 +1,9 @@
 Revision history for Test-Net-RabbitMQ
 
+0.07    Fri Feb 24, 2012
+    * Rather than just return the body of the queued message, return all the
+      metainformation that Net::RabbitMQ would have returned. (Thanks Ryan Olson!)
+
 0.06    Fri Jul 2, 2010
     * Mention the name of the queue get when is called and the queue doesn't exist.
 

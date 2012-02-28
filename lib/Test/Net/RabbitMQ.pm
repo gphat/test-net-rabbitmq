@@ -3,7 +3,7 @@ use Moose;
 use warnings;
 use strict;
 
-our $VERSION = '0.07';
+our $VERSION = '0.08';
 
 # Bindings are stored in the following form:
 # {
@@ -158,7 +158,7 @@ sub get {
 
     die "Unknown queue: $queue" unless $self->_queue_exists($queue);
 
-    my $message = pop(@{ $self->_get_queue($queue) });
+    my $message = shift(@{ $self->_get_queue($queue) });
 
     return undef unless defined($message);
 
@@ -269,7 +269,7 @@ sub recv {
     my $queue = $self->queue;
     die "No queue, did you consume() first?" unless defined($queue);
 
-    my $message = pop(@{ $self->_get_queue($self->queue) });
+    my $message = shift(@{ $self->_get_queue($self->queue) });
 
     return undef unless defined $message;
 

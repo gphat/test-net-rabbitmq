@@ -1,4 +1,6 @@
 Revision history for Test-Net-RabbitMQ
+0.08    Tue Feb 28, 2012
+    * Make queues FIFO, not LIFO. (Thanks Ryan Olson!)
 
 0.07    Fri Feb 24, 2012
     * Rather than just return the body of the queued message, return all the

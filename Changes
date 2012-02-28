@@ -1,4 +1,6 @@
 Revision history for Test-Net-RabbitMQ
+0.08    Tue Feb 28, 2012
+    * Make queues FIFO, not LIFO. (Thanks Ryan Olson!)
 
     * Support the tx_select, tx_commit, and tx_rollback methods.
 

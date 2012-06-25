@@ -1,6 +1,6 @@
 Revision history for Test-Net-RabbitMQ
 
-    * Suppor the tx_select, tx_commit, and tx_rollback methods.
+    * Support the tx_select, tx_commit, and tx_rollback methods.
 
 0.07    Fri Feb 24, 2012
     * Rather than just return the body of the queued message, return all the

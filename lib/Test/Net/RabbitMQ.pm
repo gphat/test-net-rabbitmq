@@ -93,7 +93,7 @@ has delivery_tag => (
     },
 );
 
-has _txn_messages => (
+has _tx_messages => (
     is      => 'ro',
     isa     => 'HashRef',
     default => sub{ {} },
@@ -162,10 +162,10 @@ sub tx_select {
 
     die "Unknown channel: $channel" unless $self->_channel_exists($channel);
 
-    my $messages = $self->_txn_messages->{ $channel };
+    my $messages = $self->_tx_messages->{ $channel };
     die "Transaction already started" if $messages;
 
-    $self->_txn_messages->{ $channel } = [];
+    $self->_tx_messages->{ $channel } = [];
 }
 
 sub tx_commit {
@@ -175,14 +175,14 @@ sub tx_commit {
 
     die "Unknown channel: $channel" unless $self->_channel_exists($channel);
 
-    my $messages = $self->_txn_messages->{ $channel };
+    my $messages = $self->_tx_messages->{ $channel };
     die "Transaction not yet started" unless $messages;
 
     foreach my $message (@$messages) {
         $self->_publish( $channel, @$message );
     }
 
-    delete $self->_txn_messages->{ $channel };
+    delete $self->_tx_messages->{ $channel };
 }
 
 sub tx_rollback {
@@ -192,10 +192,10 @@ sub tx_rollback {
 
     die "Unknown channel: $channel" unless $self->_channel_exists($channel);
 
-    my $messages = $self->_txn_messages->{ $channel };
+    my $messages = $self->_tx_messages->{ $channel };
     die "Transaction not yet started" unless $messages;
 
-    delete $self->_txn_messages->{ $channel };
+    delete $self->_tx_messages->{ $channel };
 }
 
 sub get {
@@ -283,7 +283,7 @@ sub publish {
     my $self = shift;
     my $channel = shift;
 
-    my $messages = $self->_txn_messages->{ $channel };
+    my $messages = $self->_tx_messages->{ $channel };
     if ($messages) {
         push @$messages, [ @_ ];
         return;

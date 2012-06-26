@@ -126,13 +126,21 @@ sub connect {
 }
 
 sub consume {
-    my ($self, $channel, $queue) = @_;
+    my ($self, $channel, $queue, $options) = @_;
 
     die "Not connected" unless $self->connected;
 
     die "Unknown channel" unless $self->_channel_exists($channel);
 
     die "Unknown queue" unless $self->_queue_exists($queue);
+
+    $options = $self->_apply_defaults( $options, {
+        no_local  => 0,
+        no_ack    => 1,
+        exclusive => 0,
+    });
+
+    die "no_ack=>0 is not supported at this time" if !$options->{no_ack};
 
     $self->queue($queue);
 }
@@ -339,6 +347,24 @@ sub recv {
     $message->{consumer_tag} = '';
 
     return $message;
+}
+
+sub _apply_defaults {
+    my ($self, $args, $defaults) = @_;
+
+    $args ||= {};
+    my $new_args = {};
+
+    foreach my $key (keys %$args) {
+        $new_args->{$key} = $args->{$key};
+    }
+
+    foreach my $key (keys %$defaults) {
+        next if exists $new_args->{$key};
+        $new_args->{$key} = $defaults->{$key};
+    }
+
+    return $new_args;
 }
 
 1;

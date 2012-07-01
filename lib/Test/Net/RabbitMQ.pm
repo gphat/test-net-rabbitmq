@@ -3,7 +3,7 @@ use Moose;
 use warnings;
 use strict;
 
-our $VERSION = '0.08';
+our $VERSION = '0.09';
 
 # Bindings are stored in the following form:
 # {

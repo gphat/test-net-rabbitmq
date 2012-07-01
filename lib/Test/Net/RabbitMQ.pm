@@ -3,7 +3,64 @@ use Moose;
 use warnings;
 use strict;
 
-our $VERSION = '0.09';
+# ABSTRACT: A mock RabbitMQ implementation for use when testing.
+
+=head1 SYNOPSIS
+
+    use Test::Net::RabbitMQ;
+
+    my $mq = Test::Net::RabbitMQ->new;
+
+    $mq->connect;
+
+    $mq->channel_open(1);
+
+    $mq->exchange_declare(1, 'order');
+    $mq->queue_declare(1, 'new-orders');
+
+    $mq->queue_bind(1, 'new-orders', 'order', 'order.new');
+
+    $mq->publish(1, 'order.new', 'hello!', { exchange => 'order' });
+
+    $mq->consume(1, 'new-orders');
+
+    my $msg = $mq->recv;
+    
+    # Or
+    
+    my $msg = $mq->get(1, 'order.new', {});
+
+=head1 DESCRIPTION
+
+Test::Net::RabbitMQ is a terrible approximation of using the real thing, but
+hopefully will allow you to test systems that use L<Net::RabbitMQ> without
+having to use an actual RabbitMQ instance.
+
+The general overview is that calls to C<publish> pushes a message into one
+or more queues (or none if there are no bindings) and calls to C<recv>
+pop them.
+
+=begin :prelude
+
+=head1 CAVEATS
+
+This module has all the features I've needed to successfully test our 
+RabbitMQ-using application. Patches are welcome if I'm missing something you
+need! At the moment there are a number of shortcomings:
+
+=over 4
+
+=item C<recv> doesn't block
+
+=item exchanges are all topic
+
+=item lots of other stuff!
+
+=back
+
+=end :prelude
+
+=cut
 
 # Bindings are stored in the following form:
 # {
@@ -18,6 +75,12 @@ has bindings => (
     isa => 'HashRef',
     default => sub { {} },
 );
+
+=attr connectable
+
+If false then any calls to connect will die to emulate a failed connection.
+
+=cut
 
 has connectable => (
     is => 'rw',
@@ -43,6 +106,13 @@ has channels => (
         _set_channel    => 'set',
     }
 );
+
+=attr debug
+
+If set to true (which you can do at any time) then a message will be emmitted
+to STDERR any time a message is added to a queue.
+
+=cut
 
 has debug => (
     is => 'rw',
@@ -99,6 +169,12 @@ has _tx_messages => (
     default => sub{ {} },
 );
 
+=method channel_close($number)
+
+Closes the specific channel.
+
+=cut
+
 sub channel_close {
     my ($self, $channel) = @_;
 
@@ -109,6 +185,12 @@ sub channel_close {
     $self->_remove_channel($channel);
 }
 
+=method channel_open($number)
+
+Opens a channel with the specific number.
+
+=cut
+
 sub channel_open {
     my ($self, $channel) = @_;
 
@@ -117,6 +199,13 @@ sub channel_open {
     $self->_set_channel($channel, 1);
 }
 
+=method connect
+
+Connects this instance.  Does nothing except set C<connected> to true.  Will
+throw an exception if you've set C<connectable> to false.
+
+=cut
+
 sub connect {
     my ($self) = @_;
 
@@ -124,6 +213,12 @@ sub connect {
 
     $self->connected(1);
 }
+
+=method consume($channel, $queue)
+
+Sets the queue that will be popped when C<recv> is called.
+
+=cut
 
 sub consume {
     my ($self, $channel, $queue, $options) = @_;
@@ -145,6 +240,12 @@ sub consume {
     $self->queue($queue);
 }
 
+=method disconnect
+
+Disconnects this instance by setting C<connected> to false.
+
+=cut
+
 sub disconnect {
     my ($self) = @_;
 
@@ -152,6 +253,12 @@ sub disconnect {
 
     $self->connected(0);
 }
+
+=method exchange_declare($channel, $exchange, $options)
+
+Creates an exchange of the specified name.
+
+=cut
 
 sub exchange_declare {
     my ($self, $channel, $exchange, $options) = @_;
@@ -162,6 +269,14 @@ sub exchange_declare {
 
     $self->_set_exchange($exchange, 1);
 }
+
+=method tx_select($channel)
+
+Begins a transaction on the specified channel.  From this point forward all
+publish() calls on the channel will be buffered until a call to L</tx_commit>
+or L</tx_rollback> is made.
+
+=cut
 
 sub tx_select {
     my ($self, $channel) = @_;
@@ -175,6 +290,13 @@ sub tx_select {
 
     $self->_tx_messages->{ $channel } = [];
 }
+
+=method tx_commit($channel)
+
+Commits a transaction on the specified channel, causing all buffered publish()
+calls to this point to be published.
+
+=cut
 
 sub tx_commit {
     my ($self, $channel) = @_;
@@ -193,6 +315,12 @@ sub tx_commit {
     delete $self->_tx_messages->{ $channel };
 }
 
+=method tx_rollback($channel)
+
+Rolls the transaction back, causing all buffered publish() calls to be wiped.
+
+=cut
+
 sub tx_rollback {
     my ($self, $channel) = @_;
 
@@ -205,6 +333,24 @@ sub tx_rollback {
 
     delete $self->_tx_messages->{ $channel };
 }
+
+=method get ($channel, $queue, $options)
+
+Get a message from the queue, if there is one.
+
+Like C<Net::RabbitMQ>, this will return a hash containing the following
+information:
+
+     {
+       body => 'Magic Transient Payload', # the reconstructed body
+       routing_key => 'nr_test_q',        # route the message took
+       exchange => 'nr_test_x',           # exchange used
+       delivery_tag => 1,                 # (inc'd every recv or get)
+       redelivered => 0,                  # always 0
+       message_count => 0,                # always 0
+     }
+
+=cut
 
 sub get {
     my ($self, $channel, $queue, $options) = @_;
@@ -226,6 +372,14 @@ sub get {
 
     return $message;
 }
+
+=method queue_bind($channel, $queue, $exchange, $routing_key)
+
+Binds the specified queue to the specified exchange using the provided
+routing key.  B<Note that, at the moment, this doesn't work with AMQP wildcards.
+Only with exact matches of the routing key.>
+
+=cut
 
 sub queue_bind {
     my ($self, $channel, $queue, $exchange, $pattern) = @_;
@@ -261,6 +415,12 @@ sub queue_bind {
     $self->bindings->{$exchange} = $binds;
 }
 
+=method queue_declare($channel, $queue, $options)
+
+Creates a queue of the specified name.
+
+=cut
+
 sub queue_declare {
     my ($self, $channel, $queue, $options) = @_;
 
@@ -270,6 +430,12 @@ sub queue_declare {
 
     $self->_set_queue($queue, []);
 }
+
+=method queue_unbind($channel, $queue, $exchange, $routing_key)
+
+Unbinds the specified routing key from the provided queue and exchange.
+
+=cut
 
 sub queue_unbind {
     my ($self, $channel, $queue, $exchange, $routing_key) = @_;
@@ -286,6 +452,13 @@ sub queue_unbind {
 
     $self->_remove_binding($routing_key);
 }
+
+=method publish($channel, $routing_key, $body, $options)
+
+Publishes the specified body with the supplied routing key.  If there is a
+binding that matches then the message will be added to the appropriate queue(s).
+
+=cut
 
 sub publish {
     my $self = shift;
@@ -331,6 +504,25 @@ sub _publish {
     }
 }
 
+=method recv
+
+Provided you've called C<consume> then calls to recv will C<pop> the next
+message of the queue.  B<Note that this method does not block.>
+
+Like C<Net::RabbitMQ>, this will return a hash containing the following
+information:
+
+     {
+       body => 'Magic Transient Payload', # the reconstructed body
+       routing_key => 'nr_test_q',        # route the message took
+       exchange => 'nr_test_x',           # exchange used
+       delivery_tag => 1,                 # (inc'd every recv or get)
+       consumer_tag => '',                # Always blank currently
+       props => $props,                   # hashref sent in
+     }
+
+=cut
+
 sub recv {
     my ($self) = @_;
 
@@ -368,181 +560,3 @@ sub _apply_defaults {
 }
 
 1;
-
-=head1 NAME
-
-Test::Net::RabbitMQ - A mock RabbitMQ implementation for use when testing.
-
-=head1 SYNOPSIS
-
-    use Test::Net::RabbitMQ;
-
-    my $mq = Test::Net::RabbitMQ->new;
-
-    $mq->connect;
-
-    $mq->channel_open(1);
-
-    $mq->exchange_declare(1, 'order');
-    $mq->queue_declare(1, 'new-orders');
-
-    $mq->queue_bind(1, 'new-orders', 'order', 'order.new');
-
-    $mq->publish(1, 'order.new', 'hello!', { exchange => 'order' });
-
-    $mq->consume(1, 'new-orders');
-
-    my $msg = $mq->recv;
-    
-    # Or
-    
-    my $msg = $mq->get(1, 'order.new', {});
-
-=head1 DESCRIPTION
-
-Test::Net::RabbitMQ is a terrible approximation of using the real thing, but
-hopefully will allow you to test systems that use L<Net::RabbitMQ> without
-having to use an actual RabbitMQ instance.
-
-The general overview is that calls to C<publish> pushes a message into one
-or more queues (or none if there are no bindings) and calls to C<recv>
-pop them.
-
-=head1 CAVEATS
-
-This module has all the features I've needed to successfully test our 
-RabbitMQ-using application. Patches are welcome if I'm missing something you
-need! At the moment there are a number of shortcomings:
-
-=over 4
-
-=item C<recv> doesn't block
-
-=item exchanges are all topic
-
-=item lots of other stuff!
-
-=back
- 
-=head1 ATTRIBUTES
-
-=head2 connectable
-
-If false then any calls to connect will die to emulate a failed connection.
-
-=head2 debug
-
-If set to true (which you can do at any time) then a message will be emmitted
-to STDERR any time a message is added to a queue.
-
-=head1 METHODS
-
-=head2 channel_open($number)
-
-Opens a channel with the specific number.
-
-=head2 channel_close($number)
-
-Closes the specific channel.
-
-=head2 connect
-
-Connects this instance.  Does nothing except set C<connected> to true.  Will
-throw an exception if you've set C<connectable> to false.
-
-=head2 consume($channel, $queue)
-
-Sets the queue that will be popped when C<recv> is called.
-
-=head2 disconnect
-
-Disconnects this instance by setting C<connected> to false.
-
-=head2 exchange_declare($channel, $exchange, $options)
-
-Creates an exchange of the specified name.
-
-=head2 get ($channel, $queue, $options)
-
-Get a message from the queue, if there is one.
-
-Like C<Net::RabbitMQ>, this will return a hash containing the following
-information:
-
-     {
-       body => 'Magic Transient Payload', # the reconstructed body
-       routing_key => 'nr_test_q',        # route the message took
-       exchange => 'nr_test_x',           # exchange used
-       delivery_tag => 1,                 # (inc'd every recv or get)
-       redelivered => 0,                  # always 0
-       message_count => 0,                # always 0
-     }
-
-=head2 tx_select($channel)
-
-Begins a transaction on the specified channel.  From this point forward all
-publish() calls on the channel will be buffered until a call to L</tx_commit>
-or L</tx_rollback> is made.
-
-=head2 tx_commit($channel)
-
-Commits a transaction on the specified channel, causing all buffered publish()
-calls to this point to be published.
-
-=head2 tx_rollback($channel)
-
-Rolls the transaction back, causing all buffered publish() calls to be wiped.
-
-=head2 queue_bind($channel, $queue, $exchange, $routing_key)
-
-Binds the specified queue to the specified exchange using the provided
-routing key.  B<Note that, at the moment, this doesn't work with AMQP wildcards.
-Only with exact matches of the routing key.>
-
-=head2 queue_declare($channel, $queue, $options)
-
-Creates a queue of the specified name.
-
-=head2 queue_unbind($channel, $queue, $exchange, $routing_key)
-
-Unbinds the specified routing key from the provided queue and exchange.
-
-=head2 publish($channel, $routing_key, $body, $options)
-
-Publishes the specified body with the supplied routing key.  If there is a
-binding that matches then the message will be added to the appropriate queue(s).
-
-=head2 recv
-
-Provided you've called C<consume> then calls to recv will C<pop> the next
-message of the queue.  B<Note that this method does not block.>
-
-Like C<Net::RabbitMQ>, this will return a hash containing the following
-information:
-
-     {
-       body => 'Magic Transient Payload', # the reconstructed body
-       routing_key => 'nr_test_q',        # route the message took
-       exchange => 'nr_test_x',           # exchange used
-       delivery_tag => 1,                 # (inc'd every recv or get)
-       consumer_tag => '',                # Always blank currently
-       props => $props,                   # hashref sent in
-     }
-
-=head1 AUTHOR
-
-Cory G Watson, C<< <gphat at cpan.org> >>
-
-=head1 COPYRIGHT & LICENSE
-
-Copyright 2010 Cory G Watson.
-
-This program is free software; you can redistribute it and/or modify it
-under the terms of either: the GNU General Public License as published
-by the Free Software Foundation; or the Artistic License.
-
-See http://dev.perl.org/licenses/ for more information.
-
-=cut
-
-1; # End of Test::Net::RabbitMQ

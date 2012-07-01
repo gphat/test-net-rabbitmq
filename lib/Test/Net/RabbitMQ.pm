@@ -93,6 +93,12 @@ has delivery_tag => (
     },
 );
 
+has _tx_messages => (
+    is      => 'ro',
+    isa     => 'HashRef',
+    default => sub{ {} },
+);
+
 sub channel_close {
     my ($self, $channel) = @_;
 
@@ -120,13 +126,21 @@ sub connect {
 }
 
 sub consume {
-    my ($self, $channel, $queue) = @_;
+    my ($self, $channel, $queue, $options) = @_;
 
     die "Not connected" unless $self->connected;
 
     die "Unknown channel" unless $self->_channel_exists($channel);
 
     die "Unknown queue" unless $self->_queue_exists($queue);
+
+    $options = $self->_apply_defaults( $options, {
+        no_local  => 0,
+        no_ack    => 1,
+        exclusive => 0,
+    });
+
+    die "no_ack=>0 is not supported at this time" if !$options->{no_ack};
 
     $self->queue($queue);
 }
@@ -147,6 +161,49 @@ sub exchange_declare {
     die "Unknown channel" unless $self->_channel_exists($channel);
 
     $self->_set_exchange($exchange, 1);
+}
+
+sub tx_select {
+    my ($self, $channel) = @_;
+
+    die "Not connected" unless $self->connected;
+
+    die "Unknown channel: $channel" unless $self->_channel_exists($channel);
+
+    my $messages = $self->_tx_messages->{ $channel };
+    die "Transaction already started" if $messages;
+
+    $self->_tx_messages->{ $channel } = [];
+}
+
+sub tx_commit {
+    my ($self, $channel) = @_;
+
+    die "Not connected" unless $self->connected;
+
+    die "Unknown channel: $channel" unless $self->_channel_exists($channel);
+
+    my $messages = $self->_tx_messages->{ $channel };
+    die "Transaction not yet started" unless $messages;
+
+    foreach my $message (@$messages) {
+        $self->_publish( $channel, @$message );
+    }
+
+    delete $self->_tx_messages->{ $channel };
+}
+
+sub tx_rollback {
+    my ($self, $channel) = @_;
+
+    die "Not connected" unless $self->connected;
+
+    die "Unknown channel: $channel" unless $self->_channel_exists($channel);
+
+    my $messages = $self->_tx_messages->{ $channel };
+    die "Transaction not yet started" unless $messages;
+
+    delete $self->_tx_messages->{ $channel };
 }
 
 sub get {
@@ -231,6 +288,19 @@ sub queue_unbind {
 }
 
 sub publish {
+    my $self = shift;
+    my $channel = shift;
+
+    my $messages = $self->_tx_messages->{ $channel };
+    if ($messages) {
+        push @$messages, [ @_ ];
+        return;
+    }
+
+    $self->_publish( $channel, @_ );
+}
+
+sub _publish {
     my ($self, $channel, $routing_key, $body, $options, $props) = @_;
 
     die "Not connected" unless $self->connected;
@@ -277,6 +347,24 @@ sub recv {
     $message->{consumer_tag} = '';
 
     return $message;
+}
+
+sub _apply_defaults {
+    my ($self, $args, $defaults) = @_;
+
+    $args ||= {};
+    my $new_args = {};
+
+    foreach my $key (keys %$args) {
+        $new_args->{$key} = $args->{$key};
+    }
+
+    foreach my $key (keys %$defaults) {
+        next if exists $new_args->{$key};
+        $new_args->{$key} = $defaults->{$key};
+    }
+
+    return $new_args;
 }
 
 1;
@@ -389,6 +477,21 @@ information:
        redelivered => 0,                  # always 0
        message_count => 0,                # always 0
      }
+
+=head2 tx_select($channel)
+
+Begins a transaction on the specified channel.  From this point forward all
+publish() calls on the channel will be buffered until a call to L</tx_commit>
+or L</tx_rollback> is made.
+
+=head2 tx_commit($channel)
+
+Commits a transaction on the specified channel, causing all buffered publish()
+calls to this point to be published.
+
+=head2 tx_rollback($channel)
+
+Rolls the transaction back, causing all buffered publish() calls to be wiped.
 
 =head2 queue_bind($channel, $queue, $exchange, $routing_key)
 

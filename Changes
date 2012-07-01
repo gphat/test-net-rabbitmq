@@ -1,6 +1,8 @@
 Revision history for Test-Net-RabbitMQ
 
 {{$NEXT}}
+
+0.09 Jun 30 2012
     * Add tx_select, tx_commit, and tx_rollback support. (bluefeet)
 
 0.08    Tue Feb 28, 2012

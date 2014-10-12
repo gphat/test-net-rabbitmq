@@ -4,7 +4,7 @@ Test::Net::RabbitMQ - A mock RabbitMQ implementation for use when testing.
 
 # VERSION
 
-version 0.09
+version 0.10
 
 # SYNOPSIS
 
@@ -27,16 +27,14 @@ version 0.09
 
     my $msg = $mq->recv;
     
-
     # Or
     
-
     my $msg = $mq->get(1, 'order.new', {});
 
 # DESCRIPTION
 
 Test::Net::RabbitMQ is a terrible approximation of using the real thing, but
-hopefully will allow you to test systems that use [Net::RabbitMQ](http://search.cpan.org/perldoc?Net::RabbitMQ) without
+hopefully will allow you to test systems that use [Net::RabbitMQ](https://metacpan.org/pod/Net::RabbitMQ) without
 having to use an actual RabbitMQ instance.
 
 The general overview is that calls to `publish` pushes a message into one
@@ -66,11 +64,11 @@ to STDERR any time a message is added to a queue.
 
 # METHODS
 
-## channel_close($number)
+## channel\_close($number)
 
 Closes the specific channel.
 
-## channel_open($number)
+## channel\_open($number)
 
 Opens a channel with the specific number.
 
@@ -87,22 +85,22 @@ Sets the queue that will be popped when `recv` is called.
 
 Disconnects this instance by setting `connected` to false.
 
-## exchange_declare($channel, $exchange, $options)
+## exchange\_declare($channel, $exchange, $options)
 
 Creates an exchange of the specified name.
 
-## tx_select($channel)
+## tx\_select($channel)
 
 Begins a transaction on the specified channel.  From this point forward all
-publish() calls on the channel will be buffered until a call to [tx_commit](#pod_tx_commit)
-or [tx_rollback](#pod_tx_rollback) is made.
+publish() calls on the channel will be buffered until a call to ["tx_commit"](#tx_commit)
+or ["tx_rollback"](#tx_rollback) is made.
 
-## tx_commit($channel)
+## tx\_commit($channel)
 
 Commits a transaction on the specified channel, causing all buffered publish()
 calls to this point to be published.
 
-## tx_rollback($channel)
+## tx\_rollback($channel)
 
 Rolls the transaction back, causing all buffered publish() calls to be wiped.
 
@@ -122,21 +120,21 @@ information:
        message_count => 0,                # always 0
      }
 
-## queue_bind($channel, $queue, $exchange, $routing_key)
+## queue\_bind($channel, $queue, $exchange, $routing\_key)
 
 Binds the specified queue to the specified exchange using the provided
 routing key.  __Note that, at the moment, this doesn't work with AMQP wildcards.
 Only with exact matches of the routing key.__
 
-## queue_declare($channel, $queue, $options)
+## queue\_declare($channel, $queue, $options)
 
 Creates a queue of the specified name.
 
-## queue_unbind($channel, $queue, $exchange, $routing_key)
+## queue\_unbind($channel, $queue, $exchange, $routing\_key)
 
 Unbinds the specified routing key from the provided queue and exchange.
 
-## publish($channel, $routing_key, $body, $options)
+## publish($channel, $routing\_key, $body, $options)
 
 Publishes the specified body with the supplied routing key.  If there is a
 binding that matches then the message will be added to the appropriate queue(s).
@@ -164,7 +162,7 @@ Cory G Watson <gphat@cpan.org>
 
 # COPYRIGHT AND LICENSE
 
-This software is copyright (c) 2012 by Cory G Watson.
+This software is copyright (c) 2014 by Cory G Watson.
 
 This is free software; you can redistribute it and/or modify it under
 the same terms as the Perl 5 programming language system itself.

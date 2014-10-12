@@ -497,7 +497,7 @@ sub _publish {
                 body         => $body,
                 routing_key  => $routing_key,
                 exchange     => $exchange,
-                props        => $props,
+                props        => $props || {},
             };
             push(@{ $self->_get_queue($binds->{$pattern}) }, $message);
         }

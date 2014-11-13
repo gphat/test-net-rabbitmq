@@ -3,6 +3,9 @@ Revision history for Test-Net-RabbitMQ
 {{$NEXT}}
 
 0.10 Oct 11 2014
+    * Message properties now default to an empty hash if none are
+      specified. This matches the behavior of Net::AMQP::RabbitMQ. (Dave
+      Rolsky)
 
 0.09 Jun 30 2012
     * Add tx_select, tx_commit, and tx_rollback support. (bluefeet)

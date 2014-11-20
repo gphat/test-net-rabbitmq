@@ -1,6 +1,8 @@
 Revision history for Test-Net-RabbitMQ
 
 {{$NEXT}}
+
+0.11 Nov 20 2014
     * Calling queue_declare would wipe out the contents of the queue if it
       already existed. (Dave Rolsky)
 

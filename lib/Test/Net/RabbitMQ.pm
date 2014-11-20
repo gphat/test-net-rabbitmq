@@ -428,7 +428,7 @@ sub queue_declare {
 
     die "Unknown channel: $channel" unless $self->_channel_exists($channel);
 
-    $self->_set_queue($queue, []);
+    $self->_set_queue($queue, []) unless $self->_queue_exists($queue);
 }
 
 =method queue_unbind($channel, $queue, $exchange, $routing_key)
